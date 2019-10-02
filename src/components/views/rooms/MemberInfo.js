@@ -376,10 +376,10 @@ module.exports = createReactClass({
             }, eventsToRedact);
         }
 
-        const count = eventsToRedact.length;
+        const amount = eventsToRedact.length;
         const user = this.props.member.name;
 
-        if (count === 0) {
+        if (amount === 0) {
             const InfoDialog = sdk.getComponent("dialogs.InfoDialog");
             Modal.createTrackedDialog('No user messages found to remove', '', InfoDialog, {
                 title: _t("No recent messages by %(user)s found", {user}),
@@ -395,10 +395,10 @@ module.exports = createReactClass({
                     title: _t("Remove recent messages by %(user)s", {user}),
                     description:
                         <div>
-                            <p>{ _t("You are about to remove %(count)s messages by %(user)s. This cannot be undone. Do you wish to continue?", {count, user}) }</p>
+                            <p>{ _t("You are about to remove %(amount)s message(s) by %(user)s. This cannot be undone. Do you wish to continue?", {amount: amount, user}) }</p>
                             <p>{ _t("For a large amount of messages, this might take some time. Please don't refresh your client in the meantime.") }</p>
                         </div>,
-                    button: _t("Remove %(count)s messages", {count}),
+                    button: _t("Remove %(amount)s message(s)", {amount}),
                     onFinished: resolve,
                 });
             });
