@@ -28,7 +28,7 @@ import {
     replaceRangeAndMoveCaret,
 } from '../../../editor/operations';
 import {getCaretOffsetAndText, getRangeForSelection} from '../../../editor/dom';
-import Autocomplete from '../rooms/Autocomplete';
+import Autocomplete, {generateCompletionDomId} from '../rooms/Autocomplete';
 import {autoCompleteCreator} from '../../../editor/parts';
 import {parsePlainTextMessage} from '../../../editor/deserialize';
 import {renderModel} from '../../../editor/render';
@@ -169,9 +169,32 @@ export default class BasicMessageEditor extends React.Component {
 
     _onCompositionEnd = (event) => {
         this._isIMEComposing = false;
-        // some browsers (chromium) don't fire an input event after ending a composition
-        // so trigger a model update after the composition is done by calling the input handler
-        this._onInput({inputType: "insertCompositionText"});
+        // some browsers (Chrome) don't fire an input event after ending a composition,
+        // so trigger a model update after the composition is done by calling the input handler.
+
+        // however, modifying the DOM (caused by the editor model update) from the compositionend handler seems
+        // to confuse the IME in Chrome, likely causing https://github.com/vector-im/riot-web/issues/10913 ,
+        // so we do it async
+
+        // however, doing this async seems to break things in Safari for some reason, so browser sniff.
+
+        const ua = navigator.userAgent.toLowerCase();
+        const isSafari = ua.includes('safari/') && !ua.includes('chrome/');
+
+        if (isSafari) {
+            this._onInput({inputType: "insertCompositionText"});
+        } else {
+            setTimeout(() => {
+                this._onInput({inputType: "insertCompositionText"});
+            }, 0);
+        }
+    }
+
+    isComposing(event) {
+        // checking the event.isComposing flag just in case any browser out there
+        // emits events related to the composition after compositionend
+        // has been fired
+        return !!(this._isIMEComposing || (event.nativeEvent && event.nativeEvent.isComposing));
     }
 
     _onPaste = (event) => {
@@ -179,6 +202,7 @@ export default class BasicMessageEditor extends React.Component {
         const {partCreator} = model;
         const text = event.clipboardData.getData("text/plain");
         if (text) {
+            this._modifiedFlag = true;
             const range = getRangeForSelection(this._editorRef, model, document.getSelection());
             const parts = parsePlainTextMessage(text, partCreator);
             replaceRangeAndMoveCaret(range, parts);
@@ -322,25 +346,35 @@ export default class BasicMessageEditor extends React.Component {
             this._insertText("\n");
             handled = true;
         // autocomplete or enter to send below shouldn't have any modifier keys pressed.
-        } else if (!(event.metaKey || event.altKey || event.shiftKey)) {
+        } else {
+            const metaOrAltPressed = event.metaKey || event.altKey;
+            const modifierPressed = metaOrAltPressed || event.shiftKey;
             if (model.autoComplete && model.autoComplete.hasCompletions()) {
                 const autoComplete = model.autoComplete;
                 switch (event.key) {
                     case "ArrowUp":
-                        autoComplete.onUpArrow(event);
-                        handled = true;
+                        if (!modifierPressed) {
+                            autoComplete.onUpArrow(event);
+                            handled = true;
+                        }
                         break;
                     case "ArrowDown":
-                        autoComplete.onDownArrow(event);
-                        handled = true;
+                        if (!modifierPressed) {
+                            autoComplete.onDownArrow(event);
+                            handled = true;
+                        }
                         break;
                     case "Tab":
-                        autoComplete.onTab(event);
-                        handled = true;
+                        if (!metaOrAltPressed) {
+                            autoComplete.onTab(event);
+                            handled = true;
+                        }
                         break;
                     case "Escape":
-                        autoComplete.onEscape(event);
-                        handled = true;
+                        if (!modifierPressed) {
+                            autoComplete.onEscape(event);
+                            handled = true;
+                        }
                         break;
                     default:
                         return; // don't preventDefault on anything else
@@ -398,8 +432,9 @@ export default class BasicMessageEditor extends React.Component {
         this.props.model.autoComplete.onComponentConfirm(completion);
     }
 
-    _onAutoCompleteSelectionChange = (completion) => {
+    _onAutoCompleteSelectionChange = (completion, completionIndex) => {
         this.props.model.autoComplete.onComponentSelectionChange(completion);
+        this.setState({completionIndex});
     }
 
     componentWillUnmount() {
@@ -501,6 +536,8 @@ export default class BasicMessageEditor extends React.Component {
             quote: ctrlShortcutLabel(">"),
         };
 
+        const {completionIndex} = this.state;
+
         return (<div className={classes}>
             { autoComplete }
             <MessageComposerFormatBar ref={ref => this._formatBarRef = ref} onAction={this._onFormatAction} shortcuts={shortcuts} />
@@ -514,7 +551,13 @@ export default class BasicMessageEditor extends React.Component {
                 onKeyDown={this._onKeyDown}
                 ref={ref => this._editorRef = ref}
                 aria-label={this.props.label}
-            ></div>
+                role="textbox"
+                aria-multiline="true"
+                aria-autocomplete="both"
+                aria-haspopup="listbox"
+                aria-expanded={Boolean(this.state.autoComplete)}
+                aria-activedescendant={completionIndex >= 0 ? generateCompletionDomId(completionIndex) : undefined}
+            />
         </div>);
     }
 
