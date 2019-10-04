@@ -33,6 +33,7 @@ import AccessibleButton from '../elements/AccessibleButton';
 import ActiveRoomObserver from '../../../ActiveRoomObserver';
 import RoomViewStore from '../../../stores/RoomViewStore';
 import SettingsStore from "../../../settings/SettingsStore";
+import {_t} from "../../../languageHandler";
 
 module.exports = createReactClass({
     displayName: 'RoomTile',
@@ -368,6 +369,8 @@ module.exports = createReactClass({
 
         const RoomAvatar = sdk.getComponent('avatars.RoomAvatar');
 
+        let ariaLabel = name;
+
         let dmIndicator;
         if (this._isDirectMessageRoom(this.props.room.roomId)) {
             dmIndicator = <img
@@ -379,12 +382,25 @@ module.exports = createReactClass({
             />;
         }
 
+        // The following labels are written in such a fashion to increase screen reader efficiency (speed).
+        if (notifBadges && mentionBadges && !isInvite) {
+            ariaLabel += " " + _t("%(count)s unread messages including mentions.", {
+                count: notificationCount,
+            });
+        } else if (notifBadges) {
+            ariaLabel += " " + _t("%(count)s unread messages.", { count: notificationCount });
+        } else if (mentionBadges && !isInvite) {
+            ariaLabel += " " + _t("Unread mentions.");
+        }
+
         return <AccessibleButton tabIndex="0"
                                  className={classes}
                                  onClick={this.onClick}
                                  onMouseEnter={this.onMouseEnter}
                                  onMouseLeave={this.onMouseLeave}
                                  onContextMenu={this.onContextMenu}
+                                 aria-label={ariaLabel}
+                                 role="option"
         >
             <div className={avatarClasses}>
                 <div className="mx_RoomTile_avatar_container">
