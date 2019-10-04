@@ -1044,7 +1044,7 @@ export default class UserInfo extends React.PureComponent {
             mute: false,
             modifyLevel: false,
             modifyLevelMax: 0,
-            redactMessages: false,
+            redactMessages: me.powerLevel >= powerLevels.redact,
         };
 
         const canAffectUser = them.powerLevel < me.powerLevel || isMe;
@@ -1063,7 +1063,6 @@ export default class UserInfo extends React.PureComponent {
         can.mute = me.powerLevel >= editPowerLevel;
         can.modifyLevel = me.powerLevel >= editPowerLevel && (isMe || me.powerLevel > them.powerLevel);
         can.modifyLevelMax = me.powerLevel;
-        can.redactMessages = me.powerLevel >= powerLevels.redact;
 
         return can;
     }
@@ -1259,7 +1258,7 @@ export default class UserInfo extends React.PureComponent {
         }
 
         return (
-            <div className="mx_MemberInfo">
+            <div className="mx_MemberInfo" role="tabpanel">
                 <div className="mx_MemberInfo_name">
                     { closeButton }
                     { e2eIconElement }
